@@ -43,52 +43,6 @@ if uploaded_files:
         except Exception as e:
             st.error(f"❌ Failed to read {file.name}: {e}")
 
-# --- MAIN PAGE OR EDIT MODE ---
-if st.session_state.editing_registry_id is not None:
-    reg = next((r for r in st.session_state.registries if r["id"] == st.session_state.editing_registry_id), None)
-    if reg:
-        render_edit_mode(reg)
-    else:
-        st.error("Registry not found.")
-else:
-    st.subheader("📑 All Draft Registries")
-
-    if st.session_state.registries:
-        df_main = pd.DataFrame([{
-            "ID": reg["id"],
-            "Registry Name": reg["name"],
-            "Approval Status": reg["approval"],
-            "Comments": reg["comments"],
-            "Owner": reg["owner"]
-        } for reg in st.session_state.registries])
-
-        st.dataframe(df_main, use_container_width=True)
-
-        # --- REGISTRY ACTIONS ---
-        for reg in st.session_state.registries:
-            with st.expander(f"🗂️ Registry #{reg['id']}: {reg['name']}"):
-                col1, col2, col3 = st.columns(3)
-                if col1.button("✏️ Edit", key=f"edit_{reg['id']}"):
-                    st.session_state.editing_registry_id = reg["id"]
-                    st.rerun()
-                if col2.button("📤 Submit", key=f"submit_{reg['id']}"):
-                    reg["submitted"] = True
-                    reg["approval"] = "Q/A Q/C"
-                    st.success(f"✅ Submitted registry #{reg['id']}")
-                if col3.button("📎 Clone", key=f"clone_{reg['id']}"):
-                    new_id = max([r["id"] for r in st.session_state.registries]) + 1
-                    st.session_state.registries.append({
-                        **reg,
-                        "id": new_id,
-                        "name": f"{reg['name']} (Clone)",
-                        "approval": "Not Published",
-                        "submitted": False
-                    })
-                    st.success(f"📎 Cloned registry #{reg['id']}")
-                    st.rerun()
-    else:
-        st.info("📥 Upload XLSX files to begin.")
-
 # --- EDIT MODE PAGE ---
 def render_edit_mode(registry):
     st.header(f"✏️ Editing Registry: {registry['name']}")
@@ -97,13 +51,23 @@ def render_edit_mode(registry):
     # Search Bar and Filters
     col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
     with col1:
-        st.text_input("🔍 Type Ahead Filter - Search Bar", placeholder="Search requirements...", key="search_bar")
+        st.text_input("🔍 Type Ahead Filter - Search Bar", placeholder="Search requirements...", key="search_bar_edit")
     with col2:
         st.selectbox("Files Uploaded", options=["File 1", "File 2", "File 3"], key="files_uploaded")
     with col3:
         st.selectbox("Country / Region", options=["All", "Japan", "Jordan", "Oregon"], key="country_region")
     with col4:
         st.selectbox("Status", options=["Q/A Q/C", "Waiting for Approval", "Not Submitted"], key="in_qa_qc")
+
+    # Display Mock Comments Table
+    st.markdown("### 💬 Comments at All Levels")
+    mock_comments = [
+        {"Level": "Document", "Comment": "This is a document-level comment.", "Author": "Bob", "Created At": "2025-04-01"},
+        {"Level": "Row", "Row ID": "row-uuid-1", "Comment": "This is a row-level comment.", "Author": "Bob", "Created At": "2025-04-02"},
+        {"Level": "Cell", "Row ID": "row-uuid-1", "Attribute": "Title", "Comment": "This is a cell-level comment.", "Author": "Bob", "Created At": "2025-04-03"},
+    ]
+    comments_df = pd.DataFrame(mock_comments)
+    st.dataframe(comments_df, use_container_width=True)
 
     # Display Requirements Table (Non-editable)
     st.markdown("### 📋 Requirements")
@@ -167,3 +131,66 @@ def render_edit_mode(registry):
             st.success("Registry deleted successfully.")
             st.session_state.editing_registry_id = None
             st.rerun()
+
+# --- MAIN PAGE OR EDIT MODE ---
+if st.session_state.editing_registry_id is not None:
+    reg = next((r for r in st.session_state.registries if r["id"] == st.session_state.editing_registry_id), None)
+    if reg:
+        render_edit_mode(reg)
+    else:
+        st.error("Registry not found.")
+else:
+    st.subheader("📑 All Draft Registries")
+
+    if st.session_state.registries:
+        df_main = pd.DataFrame([{
+            "ID": reg["id"],
+            "Registry Name": reg["name"],
+            "Approval Status": reg["approval"],
+            "Comments": reg["comments"],
+            "Owner": reg["owner"]
+        } for reg in st.session_state.registries])
+
+        st.dataframe(df_main, use_container_width=True)
+
+        # --- REGISTRY ACTIONS ---
+        for reg in st.session_state.registries:
+            with st.expander(f"🗂️ Registry #{reg['id']}: {reg['name']}"):
+                col1, col2, col3 = st.columns(3)
+                if col1.button("✏️ Edit", key=f"edit_{reg['id']}"):
+                    st.session_state.editing_registry_id = reg["id"]
+                    st.rerun()
+                if col2.button("📤 Submit", key=f"submit_{reg['id']}"):
+                    reg["submitted"] = True
+                    reg["approval"] = "Q/A Q/C"
+                    st.success(f"✅ Submitted registry #{reg['id']}")
+                if col3.button("📎 Clone", key=f"clone_{reg['id']}"):
+                    new_id = max([r["id"] for r in st.session_state.registries]) + 1
+                    st.session_state.registries.append({
+                        **reg,
+                        "id": new_id,
+                        "name": f"{reg['name']} (Clone)",
+                        "approval": "Not Published",
+                        "submitted": False
+                    })
+                    st.success(f"📎 Cloned registry #{reg['id']}")
+                    st.rerun()
+    else:
+        st.info("📥 Upload XLSX files to begin.")
+
+# --- SUBMITTED REGISTRIES ---
+st.subheader("✅ Submitted Registries")
+submitted_regs = [reg for reg in st.session_state.registries if reg["submitted"]]
+if submitted_regs:
+    for reg in submitted_regs:
+        with st.expander(f"✅ Submitted Registry #{reg['id']}: {reg['name']}"):
+            st.write(f"**Approval Status:** {reg['approval']}")
+            st.write(f"**Comments:** {reg['comments']}")
+            st.write(f"**Owner:** {reg['owner']}")
+
+            # Allow editing of submitted registries in the Process section
+            if st.button(f"✏️ Edit Submitted Registry #{reg['id']}", key=f"edit_submitted_{reg['id']}"):
+                st.session_state.editing_registry_id = reg["id"]
+                st.rerun()
+else:
+    st.info("No submitted registries available.")
